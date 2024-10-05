@@ -25,7 +25,6 @@ find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(odas_ros_msgs REQUIRED)
-find_package(audio_utils_msgs REQUIRED)
 
 set(ODAS_BUILD_SHARED_LIBRARY OFF)
 set(ODAS_INSTALL_EXECUTABLES OFF)
@@ -47,7 +46,7 @@ set(odas_shared_srcs
 
 # C++ Nodes
 add_executable(odas_core_node src/odas_core_node.cpp ${odas_shared_srcs})
-ament_target_dependencies(odas_core_node rclcpp)
+ament_target_dependencies(odas_core_node rclcpp odas_ros_msgs)
 target_link_libraries(odas_core_node odas)
 install(TARGETS odas_core_node DESTINATION lib/${PROJECT_NAME})
 
