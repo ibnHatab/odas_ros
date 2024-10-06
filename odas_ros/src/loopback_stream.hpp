@@ -9,7 +9,7 @@
 
 class LoopbackStream {
  public:
-  using HandleInputCallback = std::function<void(std::string& data)>;
+  using HandleInputCallback = std::function<void(const std::string& data)>;
   using ErrorCallback = std::function<void(const std::string& msg)>;
 
   LoopbackStream(HandleInputCallback cb, int PORT, ErrorCallback on_error)
@@ -64,18 +64,45 @@ class LoopbackStream {
       buffer[bytes_read] = '\0';  // Null-terminate the string
       std::string data(buffer);
 
-      handle_input(data);
+      split_json(data);
 
     } else if (bytes_read == -1) {
       error("Error reading from socket");
     }
   }
 
+  void split_json(const std::string& data) {
+    json_buffer_ += data;
+    size_t json_start_index = 0;
+    size_t json_stop_index = 0;
+    int depth = 0;
+
+    for (size_t i = 0; i < json_buffer_.length(); ++i) {
+      char c = json_buffer_[i];
+      if (c == '}' && depth == 0) {
+        continue;
+      } else if (c == '{') {
+        if (++depth == 1) {
+          json_start_index = i;
+        }
+      } else if (c == '}') {
+        if (--depth == 0) {
+          json_stop_index = i + 1;
+          handle_input(json_buffer_.substr(json_start_index, json_stop_index - json_start_index));
+        }
+      }
+    }
+
+    json_buffer_ = json_buffer_.substr(json_stop_index);
+  }
+
  private:
+  HandleInputCallback handle_input;
+  ErrorCallback error;
+
   int server_fd_, client_fd_;
   struct sockaddr_in address_;
   int addrlen_ = sizeof(address_);
 
-  HandleInputCallback handle_input;
-  ErrorCallback error;
+  std::string json_buffer_;
 };
