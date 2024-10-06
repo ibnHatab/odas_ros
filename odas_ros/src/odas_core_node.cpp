@@ -104,7 +104,6 @@ class OdasNode : public rclcpp::Node {
 
   std::unique_ptr<SstEventConsumer> sst_parser_;
   std::unique_ptr<LoopbackStream> sst_socket_;
-  std::stringstream sst_parser_data_;
 
   aobjects* aobjs = NULL;
   configs* cfgs = NULL;
