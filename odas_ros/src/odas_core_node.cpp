@@ -59,7 +59,7 @@ class OdasNode : public rclcpp::Node {
     sst_socket_ = std::make_unique<LoopbackStream>(sst_input, SST_PORT, ros_error);
 
     // Set up a timer to read data from the socket
-    timer_ = this->create_wall_timer(std::chrono::milliseconds(5), [this]() {
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(10), [this]() {
       ssl_socket_->read_socket();
       sst_socket_->read_socket();
     });
