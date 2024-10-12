@@ -5,12 +5,14 @@ import rclpy
 import rclpy.node
 
 import numpy as np
+import ros2_numpy as rnp
+
 import io
 import libconf
 
 import std_msgs.msg
 
-import sensor_msgs.point_cloud2 as pcl2  # type: ignore
+# import sensor_msgs.point_cloud2 as pcl2  # type: ignore
 from odas_ros_msgs.msg import OdasSstArrayStamped, OdasSslArrayStamped
 from  geometry_msgs.msg import PoseArray, Pose
 from sensor_msgs.msg import PointCloud2, PointField
@@ -48,79 +50,68 @@ class OdasVisualizationNode(rclpy.node.Node):
     def __init__(self):
         super().__init__('odas_visualization_node')
 
-        # Load ODAS configuration
-        configuration_path = self.declare_parameter('configuration_path', '').get_parameter_value().string_value
-        self._configuration = self._load_configuration(configuration_path)
+        # Stamped Pose Message containing the converted Sound Source Tracking (SST) position from ODAS.
+        self._sst_input_PoseArray = PoseArray()
+        # Subscribe to the Sound Source Tracking from ODAS Server
+        self._sst_sub = self.create_subscription(OdasSstArrayStamped, 'sst', self._sst_cb, 10)
+        # ODAS SST Publisher for PoseStamped
+        self._sst_pose_pub = self.create_publisher(PoseArray, 'sst_poses', 10)
 
-        if self._verify_sst_configuration():
-            # Stamped Pose Message containing the converted Sound Source Tracking (SST) position from ODAS.
-            self._sst_input_PoseArray = PoseArray()
-            # Subscribe to the Sound Source Tracking from ODAS Server
-            self._sst_sub = self.create_subscription(OdasSstArrayStamped, 'sst', self._sst_cb, 10)
-            # ODAS SST Publisher for PoseStamped
-            self._sst_pose_pub = self.create_publisher(PoseArray, 'sst_poses', 10)
-
-        if self._verify_ssl_configuration():
-            # Subscribe to the Sound Source Localization and Sound Source Tracking from ODAS Server
-            self._ssl_sub = self.create_subscription(OdasSslArrayStamped, 'ssl', self._ssl_cb, 10)
-            # ODAS SSL Publisher for PointCloud2
-            self._ssl_pcl_pub = self.create_publisher(PointCloud2, 'ssl_pcl2', 500)
+        # Subscribe to the Sound Source Localization and Sound Source Tracking from ODAS Server
+        self._ssl_sub = self.create_subscription(OdasSslArrayStamped, 'ssl', self._ssl_cb, 10)
+        # ODAS SSL Publisher for PointCloud2
+        self._ssl_pcl_pub = self.create_publisher(PointCloud2, 'ssl_pcl2', 500)
 
 
-    def _load_configuration(self, configuration_path):
-        with io.open(configuration_path) as f:
-            return libconf.load(f)
+    def _ssl_cb(self, ssl_msg):
+        points = np.array([[src.x, src.y, src.z, src.e] for src in ssl_msg.sources])
+        points_array = np.array(points, dtype=np.float32)
+        
+        # Define the fields for PointCloud2 (x, y, z, intensity)
+        dtype = [('x', np.float32), ('y', np.float32), ('z', np.float32), ('intensity', np.float32)]
+        num_sources = len(ssl_msg.sources)
+        # Create a structured NumPy array
+        structured_array = np.zeros(num_sources, dtype=dtype)
+        structured_array['x'] = points_array[:, 0]
+        structured_array['y'] = points_array[:, 1]
+        structured_array['z'] = points_array[:, 2]
+        structured_array['intensity'] = points_array[:, 3]
+        
+        # Convert the NumPy structured array to a PointCloud2 message
+        pointcloud_msg = rnp.msgify(PointCloud2, structured_array)
+        
+        # Set the header of the PointCloud2 message
+        pointcloud_msg.header = ssl_msg.header
 
+        self._ssl_pcl_pub.publish(pointcloud_msg)
 
-    def _verify_ssl_configuration(self):
-        # If interface type is not socket, SSL disabled.
-        # If interface type is socket and the format is json, SSL enabled.
-        if self._configuration['ssl']['potential']['interface']['type'] != 'socket':
-            return False
-        elif self._configuration['ssl']['potential']['format'] != 'json':
-            raise ValueError('The ssl format must be "json"')
-        else:
-            return True
+    # def no_ssl_cb(self, ssl):
+    #     # Sound Source Localization Callback (ODAS)
+    #     cloud_points = []
+    #     for source in ssl.sources:
+    #         # Extract xyz position of potential sound source on unit sphere from Sound Source Localization
+    #         point = [source.x, source.y, source.z, source.e]
+    #         cloud_points.append(point)
+    #     #header
+    #     header = std_msgs.msg.Header()
+    #     header.stamp = self.get_clock().now().to_msg()
+    #     header.frame_id = ssl.header.frame_id
+    #     #fields
+    #     fields = [self._point_field('x', 0, PointField.FLOAT32, 1),
+    #               self._point_field('y', 4, PointField.FLOAT32, 1),
+    #               self._point_field('z', 8, PointField.FLOAT32, 1),
+    #               self._point_field('intensity', 12, PointField.FLOAT32, 1)]
+    #     #create pcl from points
+    #     pcl = pcl2.create_cloud(header, fields, cloud_points)
+    #     self._ssl_pcl_pub.publish(pcl)
 
-
-    def _verify_sst_configuration(self):
-        # If interface type is not socket, SST disabled.
-        # If interface type is socket and the format is json, SST enabled.
-        if self._configuration['sst']['tracked']['interface']['type'] != 'socket':
-            return False
-        elif self._configuration['sst']['tracked']['format'] != 'json':
-            raise ValueError('The sst format must be "json"')
-        else:
-            return True
-
-
-    def _ssl_cb(self, ssl):
-        # Sound Source Localization Callback (ODAS)
-        cloud_points = []
-        for source in ssl.sources:
-            # Extract xyz position of potential sound source on unit sphere from Sound Source Localization
-            point = [source.x, source.y, source.z, source.e]
-            cloud_points.append(point)
-        #header
-        header = std_msgs.msg.Header()
-        header.stamp = self.get_clock().now().to_msg()
-        header.frame_id = ssl.header.frame_id
-        #fields
-        fields = [self._point_field('x', 0, PointField.FLOAT32, 1),
-                  self._point_field('y', 4, PointField.FLOAT32, 1),
-                  self._point_field('z', 8, PointField.FLOAT32, 1),
-                  self._point_field('intensity', 12, PointField.FLOAT32, 1)]
-        #create pcl from points
-        pcl = pcl2.create_cloud(header, fields, cloud_points)
-        self._ssl_pcl_pub.publish(pcl)
-
-    def _point_field(self, name, offset, datatype, count):
-        msg = PointField()
-        msg.name = name
-        msg.offset = offset
-        msg.datatype = datatype
-        msg.count = count
-        return msg
+    # def _point_field(self, name, offset, datatype, count):
+    #     msg = PointField()
+    #     msg.name = name
+    #     msg.offset = offset
+    #     msg.datatype = datatype
+    #     msg.count = count
+    #     return msg
 
     def _sst_cb(self, sst):
         # Sound Source Tracking Callback (ODAS)

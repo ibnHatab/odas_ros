@@ -1,5 +1,6 @@
 #pragma once
 
+#include <rclcpp/rclcpp.hpp>
 #include <nlohmann/json.hpp>
 
 #include "odas_ros_msgs/msg/odas_ssl.hpp"
@@ -8,6 +9,7 @@
 #include "odas_ros_msgs/msg/odas_sst_array_stamped.hpp"
 
 using json = nlohmann::json;
+static const std::string frame_id = "odas";
 
 template <typename ArrayType, typename SrcType>
 class EventConsumer : public json::json_sax_t {
@@ -31,6 +33,9 @@ class EventConsumer : public json::json_sax_t {
       odas_array.sources.push_back(src_data);
       return true;
     } else {
+      odas_array.header.frame_id = frame_id;
+      odas_array.header.stamp = rclcpp::Clock().now();
+      
       callback(odas_array);
       return true;
     }
@@ -133,7 +138,7 @@ class SstEventConsumer
     : public EventConsumer<odas_ros_msgs::msg::OdasSstArrayStamped, odas_ros_msgs::msg::OdasSst> {
  public:
   SstEventConsumer(OdasArrayCallback cb, ErrorCallback on_error) : EventConsumer(cb, on_error) {}
-  bool number_integer(number_integer_t val) override {
+  bool number_integer(number_integer_t val) override {    
     if (current_key == "timeStamp") {
       odas_array.odas_time_stamp = static_cast<int>(val);
     } else if (inside_src && current_key == "id") {

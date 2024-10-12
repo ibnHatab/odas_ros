@@ -33,6 +33,7 @@ class OdasNode : public rclcpp::Node {
  public:
   OdasNode() : Node("odas_node") {
     // Create a publisher for OdasSstArray messages
+
     ssl_publisher_ = this->create_publisher<odas_ros_msgs::msg::OdasSslArrayStamped>("ssl", 10);
     auto ssl_callback = [this](const odas_ros_msgs::msg::OdasSslArrayStamped& msg) {
       ssl_publisher_->publish(msg);
