@@ -85,34 +85,6 @@ class OdasVisualizationNode(rclpy.node.Node):
 
         self._ssl_pcl_pub.publish(pointcloud_msg)
 
-    # def no_ssl_cb(self, ssl):
-    #     # Sound Source Localization Callback (ODAS)
-    #     cloud_points = []
-    #     for source in ssl.sources:
-    #         # Extract xyz position of potential sound source on unit sphere from Sound Source Localization
-    #         point = [source.x, source.y, source.z, source.e]
-    #         cloud_points.append(point)
-    #     #header
-    #     header = std_msgs.msg.Header()
-    #     header.stamp = self.get_clock().now().to_msg()
-    #     header.frame_id = ssl.header.frame_id
-    #     #fields
-    #     fields = [self._point_field('x', 0, PointField.FLOAT32, 1),
-    #               self._point_field('y', 4, PointField.FLOAT32, 1),
-    #               self._point_field('z', 8, PointField.FLOAT32, 1),
-    #               self._point_field('intensity', 12, PointField.FLOAT32, 1)]
-    #     #create pcl from points
-    #     pcl = pcl2.create_cloud(header, fields, cloud_points)
-    #     self._ssl_pcl_pub.publish(pcl)
-
-    # def _point_field(self, name, offset, datatype, count):
-    #     msg = PointField()
-    #     msg.name = name
-    #     msg.offset = offset
-    #     msg.datatype = datatype
-    #     msg.count = count
-    #     return msg
-
     def _sst_cb(self, sst):
         # Sound Source Tracking Callback (ODAS)
         self._sst_input_PoseArray.header.stamp = self.get_clock().now().to_msg()
@@ -120,6 +92,8 @@ class OdasVisualizationNode(rclpy.node.Node):
         self._sst_input_PoseArray.poses = []
 
         for src in sst.sources:
+            if src.id == 0:
+                continue
             q = self._unit_vector_to_quaternion(src.x, src.y, src.z)
 
             # Update the SST PoseStamped

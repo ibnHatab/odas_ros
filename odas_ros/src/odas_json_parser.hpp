@@ -62,6 +62,13 @@ class EventConsumer : public json::json_sax_t {
     return true;
   }
 
+  bool number_unsigned(number_unsigned_t val) override {
+    if (current_key == "timeStamp") {
+      odas_array.odas_time_stamp = static_cast<int>(val);
+    }
+    return true;
+  }
+
   bool parse_error(std::size_t position, const std::string& last_token,
                    const json::exception& ex) override {
     if (last_token.back() == '{') {
@@ -74,6 +81,7 @@ class EventConsumer : public json::json_sax_t {
 
     return false;
   }
+
 
   bool null() override { return true; }
   bool boolean(bool val) override {
@@ -88,7 +96,7 @@ class EventConsumer : public json::json_sax_t {
     (void)val;
     return true;
   }
-  bool number_unsigned(number_unsigned_t val) override {
+  bool number_integer(number_integer_t val) override {
     (void)val;
     return true;
   }
@@ -108,13 +116,6 @@ class SslEventConsumer
     : public EventConsumer<odas_ros_msgs::msg::OdasSslArrayStamped, odas_ros_msgs::msg::OdasSsl> {
  public:
   SslEventConsumer(OdasArrayCallback cb, ErrorCallback on_error) : EventConsumer(cb, on_error) {}
-
-  bool number_integer(number_integer_t val) override {
-    if (current_key == "timeStamp") {
-      odas_array.odas_time_stamp = static_cast<int>(val);
-    }
-    return true;
-  }
 
   bool number_float(number_float_t val, const string_t& s) override {
     (void)s;
@@ -138,13 +139,12 @@ class SstEventConsumer
     : public EventConsumer<odas_ros_msgs::msg::OdasSstArrayStamped, odas_ros_msgs::msg::OdasSst> {
  public:
   SstEventConsumer(OdasArrayCallback cb, ErrorCallback on_error) : EventConsumer(cb, on_error) {}
-  bool number_integer(number_integer_t val) override {    
-    if (current_key == "timeStamp") {
-      odas_array.odas_time_stamp = static_cast<int>(val);
-    } else if (inside_src && current_key == "id") {
+  //bool number_integer(number_integer_t val) override {    
+  bool number_unsigned(number_unsigned_t val) override {
+    if (inside_src && current_key == "id") {
       src_data.id = static_cast<int>(val);
     }
-    return true;
+    return EventConsumer::number_unsigned(val);
   }
 
   bool number_float(number_float_t val, const string_t& s) override {
