@@ -51,6 +51,7 @@ target_link_libraries(odas_core_node odas)
 install(TARGETS odas_core_node DESTINATION lib/${PROJECT_NAME})
 
 target_include_directories(odas_core_node PRIVATE
+    include
     src/odas/include
     src/odas/include/odas
     src/odas/demo/odaslive
